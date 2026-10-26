@@ -1,0 +1,10 @@
+# Copy to car.toml and fill in. IDs come from the IC_204 CBF (CP_REQUEST_CANIDENTIFIER /
+# CP_RESPONSE_CANIDENTIFIER / CP_BAUDRATE) or from a Vediamo channel trace. Never guess them.
+[cluster]
+# txid = 0x000
+# rxid = 0x000
+baud = 500000
+sw = "2049022903"
+
+[openport]
+dll = 'C:\Windows\SysWOW64\op20pt32.dll'

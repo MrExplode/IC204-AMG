@@ -1,0 +1,35 @@
+[project]
+name = "ic204amg"
+version = "0.1.0"
+description = "W204 IC204 AMG-menu EEPROM job over an Openport 2.0 (J2534), standalone, no Vediamo"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.15"
+dependencies = ["udsoncan==1.26.1"]
+
+[project.scripts]
+ic204amg = "ic204amg.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[dependency-groups]
+dev = ["pytest>=9", "ruff>=0.17", "ty>=0.0.92"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py315"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "PTH", "C4", "RET", "ARG", "PERF", "N"]
+
+[tool.ty.environment]
+python-platform = "win32"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

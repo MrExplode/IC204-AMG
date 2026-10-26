@@ -1,0 +1,23 @@
+ECU IC_204
+  interface[0] UDS
+  subtype HSCAN_UDS_500
+    CP_BAUDRATE = 500000 (0x7A120)  interface 0
+    CP_GLOBAL_REQUEST_CANIDENTIFIER = 1089 (0x441)  interface 0
+    CP_FUNCTIONAL_REQUEST_CANIDENTIFIER = 1089 (0x441)  interface 0
+    CP_REQUEST_CANIDENTIFIER = 1546 (0x60A)  interface 0
+    CP_RESPONSE_CANIDENTIFIER = 1153 (0x481)  interface 0
+    CP_PARTNUMBERID = 0 (0x0)  interface 0
+    CP_PARTBLOCK = 1 (0x1)  interface 0
+    CP_HWVERSIONID = 0 (0x0)  interface 0
+    CP_SWVERSIONID = 0 (0x0)  interface 0
+    CP_SWVERSIONBLOCK = 1 (0x1)  interface 0
+    CP_SUPPLIERID = 61780 (0xF154)  interface 0
+    CP_SWSUPPLIERBLOCK = 1 (0x1)  interface 0
+    CP_STMIN_SUG = 20 (0x14)  interface 0
+    CP_BLOCKSIZE_SUG = 8 (0x8)  interface 0
+    CP_P2_TIMEOUT = 150 (0x96)  interface 0
+    CP_P2_EXT_TIMEOUT_7F_78 = 2000 (0x7D0)  interface 0
+    CP_P3_TIME_NEXTREQ_PHYS = 2000 (0x7D0)  interface 0
+    CP_S3_TP_FUNC_TIMER = 2000 (0x7D0)  interface 0
+    CP_P3_TIME_NEXTREQ_FUNC = 150 (0x96)  interface 0
+    CPI_ROUTINECOUNTER = 30 (0x1E)  interface 0

@@ -1,0 +1,11 @@
+.venv/
+dist/
+logs/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+backups/
+
+# your filled-in config (ship car.example.toml only)
+car.toml
