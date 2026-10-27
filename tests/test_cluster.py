@@ -75,6 +75,15 @@ def test_write_fc_to_ff_keeps_other_bytes(backup_path):
     assert cl.Backup.load(backup_path).amg == H(AMG0)
 
 
+def test_write_reunlocks_immediately_before_writing(backup_path):
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    cl.run_write(c, backup_path, yes)
+    write_i = next(i for i, r in enumerate(t.sent) if r[0] == uds.SID_WRITE_MEMORY)
+    assert t.sent[write_i - 1][:2] == H("270A")  # a fresh key is sent right before the write
+    assert t.sent[write_i - 2][:2] == H("2709")
+
+
 def test_write_ff_to_fc(backup_path):
     ecu = FakeIc204(amg="FF00112233445566")
     _, c = connect(ecu)

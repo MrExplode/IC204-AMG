@@ -172,6 +172,9 @@ def run_write(
     )
     if not confirm(prompt, f"{new0:02X}"):
         raise Stop("write declined; nothing written")
+    # Security access lapses while the prompt waits for the operator, faster than the S3
+    # session timer TesterPresent refreshes, so re-unlock immediately before every write.
+    cluster.unlock()
     cluster.write_window(uds.AMG, new)
     cluster.reset()
     log.info("done: check AMG page, odometer and lamps per the runbook; lamp trouble -> lampfix")
@@ -190,6 +193,7 @@ def run_lampfix(cluster: Cluster, backup_path: Path, confirm: Confirm) -> None:
     )
     if not confirm(prompt, f"{uds.LAMP_FIX_BYTE:02X}"):
         raise Stop("lamp fix declined; nothing written")
+    cluster.unlock()
     cluster.write_window(uds.LAMP, new)
     cluster.reset()
 
@@ -209,5 +213,6 @@ def run_restore(
         prompt = f"RESTORE {window.name}\n  current: {uds.hexs(cur)}\n  backup:  {uds.hexs(want)}"
         if not confirm(prompt, f"{token:02X}"):
             raise Stop("restore declined")
+        cluster.unlock()
         cluster.write_window(window, want)
     cluster.reset()
