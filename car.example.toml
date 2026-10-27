@@ -1,11 +1,14 @@
-# Copy to car.toml and fill in. IDs come from the IC_204 CBF (CP_REQUEST_CANIDENTIFIER /
-# CP_RESPONSE_CANIDENTIFIER / CP_BAUDRATE) or from a Vediamo channel trace. Never guess them.
+# Copy to car.toml and fill in `sw`. The CAN ids below are the IC_204 ones from the Xentry CBF
+# (CP_REQUEST_CANIDENTIFIER / CP_RESPONSE_CANIDENTIFIER / CP_BAUDRATE, see
+# tools/cbf/ic204_comparams.txt). For any other cluster take them from its own CBF or a Vediamo
+# channel trace; never guess them.
 [cluster]
-# txid = 0x000
-# rxid = 0x000
+txid = 0x60A
+rxid = 0x481
 baud = 500000
-# SW part number -> seed-key salt table. Run `ic204amg selftest` to list the supported ones.
-sw = "2049022903"
+# Your cluster's software part number as Xentry/Vediamo show it; it selects the seed-key salt
+# table, so a wrong one is a rejected key. `ic204amg selftest` lists the supported ones.
+# sw = "2049022903"
 
 [openport]
 dll = 'C:\Windows\SysWOW64\op20pt32.dll'

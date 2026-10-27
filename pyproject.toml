@@ -8,6 +8,10 @@ license-files = ["LICENSE"]
 requires-python = ">=3.15"
 dependencies = ["udsoncan==1.26.1"]
 
+[project.urls]
+Repository = "https://github.com/MrExplode/IC204-AMG"
+Issues = "https://github.com/MrExplode/IC204-AMG/issues"
+
 [project.scripts]
 ic204amg = "ic204amg.cli:main"
 
