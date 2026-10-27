@@ -47,8 +47,8 @@ def test_check_battery(volts, required, stops):
 
 
 def test_write_level_flag_parses_hex():
-    assert parse("write").write_level == "0x09"
-    assert int(parse("write", "--write-level", "0x0D").write_level, 16) == 0x0D
+    assert parse("write").write_level == "0x0D"
+    assert int(parse("write", "--write-level", "0x09").write_level, 16) == 0x09
 
 
 def test_write_level_flag_rejects_unlisted_value():

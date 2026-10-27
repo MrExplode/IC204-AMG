@@ -95,8 +95,8 @@ def build_parser() -> argparse.ArgumentParser:
     writing.add_argument(
         "--write-level",
         choices=["0x01", "0x03", "0x09", "0x0D"],
-        default="0x09",
-        help="SecurityAccess level for the write unlock; try 0x0D if a write returns 7F 3D 33",
+        default="0x0D",
+        help="SecurityAccess level for the write unlock; drop to 0x09 if 0x0D is rejected",
     )
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("selftest", help="seed-key vectors, udsoncan import, DLL load; no cable")
