@@ -1,8 +1,9 @@
-"""IC204 seed-key algorithm (NEC V850E1 firmware, reverse engineered).
+"""IC204 seed-key algorithm (NEC V850E1 cluster firmware, reverse engineered).
 
-Vendored from https://github.com/Mattwmaster58/ic204 (ic204_seedkey.py), trimmed to the
-algorithm and its salt tables; the upstream CLI and self-test are not included. Test vectors
-are from https://github.com/jglim/UnlockECU/issues/10.
+Python implementation of the same algorithm shipped by jglim/UnlockECU (MIT licensed;
+Security/IC204.cs). The salt tables are the reverse-engineered firmware constants; the test
+vectors are from https://github.com/jglim/UnlockECU/issues/10. The reverse engineering is also
+documented at https://github.com/Mattwmaster58/ic204.
 
 The core is bit-identical across all firmware versions; only the per-level 8-byte salt tables
 differ. Firmware functions: FUN_00180b56 rotate_right_array, FUN_00180bd2 salt_transform,
