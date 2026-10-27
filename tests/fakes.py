@@ -5,8 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from ic204amg import uds
+from ic204amg.profile import W204_COLOUR
 from ic204amg.seedkey import ic204_generate_key
 
+assert W204_COLOUR.lamp is not None
+AMG = W204_COLOUR.amg
+LAMP = W204_COLOUR.lamp.window
 SW = "2049022903"
 SEED = bytes.fromhex("5C97A0A552FB0205")
 KEY = ic204_generate_key(0x09, SEED, SW)
@@ -50,7 +54,7 @@ class FakeIc204:
         noise: Sequence[bytes] = (),
         drop_writes: bool = False,
     ):
-        self.mem = {uds.AMG: bytearray.fromhex(amg), uds.LAMP: bytearray.fromhex(lamp)}
+        self.mem = {AMG: bytearray.fromhex(amg), LAMP: bytearray.fromhex(lamp)}
         self.seed, self.accept_key, self.pending_reads = seed, accept_key, pending_reads
         self.noise, self.drop_writes = list(noise), drop_writes
         self.unlocked, self.session, self.resets = unlocked, 1, 0

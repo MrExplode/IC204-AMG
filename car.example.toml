@@ -4,7 +4,26 @@
 # txid = 0x000
 # rxid = 0x000
 baud = 500000
+# SW part number -> seed-key salt table. Run `ic204amg selftest` to list the supported ones.
 sw = "2049022903"
 
 [openport]
 dll = 'C:\Windows\SysWOW64\op20pt32.dll'
+
+# The AMG recipe. Omit both [amg] and [lamp] to use the built-in W204 colour-cluster profile
+# (the only one verified on a car): amg 0x01D0 byte 0 FC<->FF, lamp 0x0260 last byte -> 0x60.
+# For any other cluster these offsets/values are community-reported and UNVERIFIED: read your
+# own backup first and change one byte at a time. See the README variant table.
+#
+# [amg]
+# offset = 0x01D0   # EEPROM window with the AMG flags (addressAndLengthFormatIdentifier 0x14)
+# length = 8
+# byte   = 0        # index of the flag byte within the window
+# off    = 0xFC     # value when AMG is off; `write` toggles between off and on
+# on     = 0xFF     # value when AMG is on; any other current value is a STOP
+#
+# [lamp]             # optional indicator-lamp fix; omit the whole section if not needed
+# offset = 0x0260
+# length = 10
+# byte   = -1       # index to set (negative counts from the end)
+# value  = 0x60

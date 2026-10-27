@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import uds
+from .profile import W204_COLOUR, Profile
 from .seedkey import ic204_generate_key
 from .transport import Transport
 
@@ -30,29 +31,40 @@ class Stop(Exception):  # noqa: N818 - a controlled halt, not a failure
 
 @dataclass(frozen=True, slots=True)
 class Backup:
+    """Original bytes of the profile's windows; lamp is None when the profile has no lamp fix."""
+
     amg: bytes
-    lamp: bytes
+    lamp: bytes | None = None
     meta: dict[str, str] = field(default_factory=dict)
 
-    def __post_init__(self) -> None:
-        for window, data in ((uds.AMG, self.amg), (uds.LAMP, self.lamp)):
-            if len(data) != window.length:
-                raise ValueError(f"{window.name} must be {window.length} bytes, got {len(data)}")
-
-    def save(self, path: Path) -> None:
+    def save(self, path: Path, profile: Profile) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        doc = {uds.AMG.name: self.amg.hex().upper(), uds.LAMP.name: self.lamp.hex().upper()}
+        doc = {profile.amg.name: self.amg.hex().upper()}
+        if profile.lamp is not None and self.lamp is not None:
+            doc[profile.lamp.window.name] = self.lamp.hex().upper()
         path.write_text(json.dumps(doc | self.meta, indent=2), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> Backup:
+    def load(cls, path: Path, profile: Profile) -> Backup:
+        names = {profile.amg.name}
         try:
             doc = json.loads(path.read_text(encoding="utf-8"))
-            amg, lamp = bytes.fromhex(doc[uds.AMG.name]), bytes.fromhex(doc[uds.LAMP.name])
-            meta = {k: str(v) for k, v in doc.items() if k not in (uds.AMG.name, uds.LAMP.name)}
+            amg = _window_bytes(doc, profile.amg)
+            lamp = None
+            if profile.lamp is not None and profile.lamp.window.name in doc:
+                lamp = _window_bytes(doc, profile.lamp.window)
+                names.add(profile.lamp.window.name)
+            meta = {k: str(v) for k, v in doc.items() if k not in names}
             return cls(amg, lamp, meta)
         except (KeyError, TypeError, ValueError) as e:
             raise ValueError(f"{path}: not a backup file ({e})") from e
+
+
+def _window_bytes(doc: dict[str, object], window: uds.Window) -> bytes:
+    data = bytes.fromhex(str(doc[window.name]))
+    if len(data) != window.length:
+        raise ValueError(f"{window.name} must be {window.length} bytes, got {len(data)}")
+    return data
 
 
 class Cluster:
@@ -64,10 +76,12 @@ class Cluster:
         p2: float = P2,
         p2_star: float = P2_STAR,
         meta: Mapping[str, str] | None = None,
+        profile: Profile = W204_COLOUR,
     ):
         self.t = transport
         self.sw, self.level, self.p2, self.p2_star = sw, level, p2, p2_star
         self.meta = dict(meta or {})
+        self.profile = profile
 
     def request(self, label: str, req: bytes) -> bytes:
         self.t.flush()
@@ -115,6 +129,9 @@ class Cluster:
         return uds.memory_data(window, resp)
 
     def write_window(self, window: uds.Window, data: bytes) -> None:
+        if window not in self.profile.windows:
+            allowed = ", ".join(w.name for w in self.profile.windows)
+            raise ValueError(f"refusing to write {window.name}: only {allowed} are writable")
         req = uds.write_memory(window, data)
         uds.check_write_echo(req, self.request(f"write {window.name}", req))
         got = self.read_window(window)
@@ -129,27 +146,20 @@ class Cluster:
         self.request("ECU reset", uds.ecu_reset())
 
     def backup(self) -> Backup:
-        amg = self.read_window(uds.AMG)
-        lamp = self.read_window(uds.LAMP)
-        log.info("BACKUP %s = %s", uds.AMG.name, uds.hexs(amg))
-        log.info("BACKUP %s = %s", uds.LAMP.name, uds.hexs(lamp))
+        amg = self.read_window(self.profile.amg)
+        log.info("BACKUP %s = %s", self.profile.amg.name, uds.hexs(amg))
+        lamp = None
+        if self.profile.lamp is not None:
+            lamp = self.read_window(self.profile.lamp.window)
+            log.info("BACKUP %s = %s", self.profile.lamp.window.name, uds.hexs(lamp))
         meta = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "sw": self.sw} | self.meta
         return Backup(amg, lamp, meta)
-
-
-def decide_byte0(current: int) -> int:
-    """Colour-cluster rule from the runbook: FC<->FF, anything else means stop."""
-    if current == 0xFC:
-        return 0xFF
-    if current == 0xFF:
-        return 0xFC
-    raise Stop(f"{uds.AMG.name} byte 0 is {current:02X}, not FC/FF: do not write")
 
 
 def run_readonly(cluster: Cluster, backup_path: Path) -> Backup:
     cluster.unlock()
     b = cluster.backup()
-    b.save(backup_path)
+    b.save(backup_path, cluster.profile)
     log.info("backup saved: %s", backup_path)
     return b
 
@@ -162,23 +172,35 @@ def run_write(
     write_level: int | None = None,
 ) -> None:
     b = run_readonly(cluster, backup_path)
+    window, rule = cluster.profile.amg, cluster.profile.rule
     if expect is not None and b.amg != expect.amg:
         raise Stop(
-            f"{uds.AMG.name} is {uds.hexs(b.amg)} but the earlier backup says "
+            f"{window.name} is {uds.hexs(b.amg)} but the earlier backup says "
             f"{uds.hexs(expect.amg)}; find out why before writing"
         )
-    new0 = decide_byte0(b.amg[0])
-    new = bytes([new0]) + b.amg[1:]
+    cur = b.amg[rule.byte]
+    if cur == rule.off:
+        new_val = rule.on
+    elif cur == rule.on:
+        new_val = rule.off
+    else:
+        raise Stop(
+            f"{window.name} byte {rule.byte} is {cur:02X}, "
+            f"not {rule.off:02X}/{rule.on:02X}: do not write"
+        )
+    new = bytearray(b.amg)
+    new[rule.byte] = new_val
+    new = bytes(new)
     prompt = (
-        f"WRITE {uds.AMG.name} byte 0: {b.amg[0]:02X} -> {new0:02X}\n"
+        f"WRITE {window.name} byte {rule.byte}: {cur:02X} -> {new_val:02X}\n"
         f"  current: {uds.hexs(b.amg)}\n  new:     {uds.hexs(new)}"
     )
-    if not confirm(prompt, f"{new0:02X}"):
+    if not confirm(prompt, f"{new_val:02X}"):
         raise Stop("write declined; nothing written")
     # Security access lapses while the prompt waits for the operator, faster than the S3
     # session timer TesterPresent refreshes, so re-unlock immediately before every write.
     cluster.unlock(write_level)
-    cluster.write_window(uds.AMG, new)
+    cluster.write_window(window, new)
     cluster.reset()
     log.info("done: check AMG page, odometer and lamps per the runbook; lamp trouble -> lampfix")
 
@@ -186,20 +208,28 @@ def run_write(
 def run_lampfix(
     cluster: Cluster, backup_path: Path, confirm: Confirm, write_level: int | None = None
 ) -> None:
-    """Runbook step 12, only after a lamp misbehaves: last byte of 0x0260 -> 60."""
+    """Runbook step 12, only after a lamp misbehaves: set the profile's lamp byte."""
+    lamp = cluster.profile.lamp
+    if lamp is None:
+        raise Stop("this profile has no lamp window; nothing to fix")
     b = run_readonly(cluster, backup_path)
-    new = b.lamp[:-1] + bytes([uds.LAMP_FIX_BYTE])
+    assert b.lamp is not None  # the profile has a lamp window, so backup read it
+    new = bytearray(b.lamp)
+    new[lamp.byte] = lamp.value
+    new = bytes(new)
     if b.lamp == new:
-        log.info("%s already ends in %02X: nothing to write", uds.LAMP.name, uds.LAMP_FIX_BYTE)
+        log.info(
+            "%s byte %d already %02X: nothing to write", lamp.window.name, lamp.byte, lamp.value
+        )
         return
     prompt = (
-        f"WRITE {uds.LAMP.name} last byte: {b.lamp[-1]:02X} -> {uds.LAMP_FIX_BYTE:02X}\n"
+        f"WRITE {lamp.window.name} byte {lamp.byte}: {b.lamp[lamp.byte]:02X} -> {lamp.value:02X}\n"
         f"  current: {uds.hexs(b.lamp)}\n  new:     {uds.hexs(new)}"
     )
-    if not confirm(prompt, f"{uds.LAMP_FIX_BYTE:02X}"):
+    if not confirm(prompt, f"{lamp.value:02X}"):
         raise Stop("lamp fix declined; nothing written")
     cluster.unlock(write_level)
-    cluster.write_window(uds.LAMP, new)
+    cluster.write_window(lamp.window, new)
     cluster.reset()
 
 
@@ -212,16 +242,21 @@ def run_restore(
     write_level: int | None = None,
 ) -> None:
     current = run_readonly(cluster, backup_path)
-    windows = [(uds.AMG, current.amg, saved.amg)]
+    windows = [(cluster.profile.amg, current.amg, saved.amg, cluster.profile.rule.byte)]
     if lamp:
-        windows.append((uds.LAMP, current.lamp, saved.lamp))
-    for window, cur, want in windows:
+        if cluster.profile.lamp is None:
+            raise Stop("this profile has no lamp window to restore")
+        windows.append(
+            (cluster.profile.lamp.window, current.lamp, saved.lamp, cluster.profile.lamp.byte)
+        )
+    for window, cur, want, token_byte in windows:
+        if cur is None or want is None:
+            raise Stop(f"{window.name}: backup has no bytes for this window")
         if cur == want:
             log.info("%s already equals the backup, skipping", window.name)
             continue
-        token = want[0] if window == uds.AMG else want[-1]
         prompt = f"RESTORE {window.name}\n  current: {uds.hexs(cur)}\n  backup:  {uds.hexs(want)}"
-        if not confirm(prompt, f"{token:02X}"):
+        if not confirm(prompt, f"{want[token_byte]:02X}"):
             raise Stop("restore declined")
         cluster.unlock(write_level)
         cluster.write_window(window, want)

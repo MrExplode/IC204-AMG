@@ -29,12 +29,6 @@ class Window:
         return f"0x{self.offset:04X}"
 
 
-AMG = Window(0x01D0, 8)
-LAMP = Window(0x0260, 10)
-# The only EEPROM bytes this tool may ever write; write_memory() refuses anything else.
-WRITABLE = (AMG, LAMP)
-LAMP_FIX_BYTE = 0x60
-
 NRC = {
     0x10: "general reject",
     0x11: "service not supported",
@@ -87,9 +81,7 @@ def read_memory(window: Window) -> bytes:
 
 
 def write_memory(window: Window, data: bytes) -> bytes:
-    if window not in WRITABLE:
-        allowed = ", ".join(w.name for w in WRITABLE)
-        raise ValueError(f"refusing to write {window.name}: only {allowed} are writable")
+    """Build a 0x3D request. The writable-window allow-list is enforced by Cluster.write_window."""
     if len(data) != window.length:
         raise ValueError(f"{window.name} takes {window.length} bytes, got {len(data)}")
     return bytes([SID_WRITE_MEMORY]) + _address(window) + data

@@ -2,6 +2,7 @@ import pytest
 
 from ic204amg import cli
 from ic204amg import cluster as cl
+from ic204amg import profile as pf
 
 
 def parse(*argv):
@@ -14,7 +15,33 @@ def test_settings_cli_overrides_config(tmp_path):
         '[cluster]\ntxid = 0x60A\nrxid = 0x481\nsw = "2049022903"\n[openport]\ndll = "x.dll"\n'
     )
     s = cli.settings(parse("--config", str(cfg), "--rxid", "0x482", "probe"))
-    assert s == cli.Settings(sw="2049022903", dll="x.dll", baud=500000, txid=0x60A, rxid=0x482)
+    assert s == cli.Settings(
+        sw="2049022903", dll="x.dll", baud=500000, profile=pf.W204_COLOUR, txid=0x60A, rxid=0x482
+    )
+
+
+def test_profile_defaults_to_w204_colour_without_amg_section(tmp_path):
+    cfg = tmp_path / "car.toml"
+    cfg.write_text("[cluster]\ntxid = 0x60A\nrxid = 0x481\n")
+    assert cli.settings(parse("--config", str(cfg), "probe")).profile is pf.W204_COLOUR
+
+
+def test_profile_from_config(tmp_path):
+    cfg = tmp_path / "car.toml"
+    cfg.write_text(
+        "[cluster]\ntxid = 0x60A\nrxid = 0x481\n"
+        "[amg]\noffset = 0x0100\nlength = 4\nbyte = 1\noff = 0x00\non = 0x01\n"
+    )
+    p = cli.settings(parse("--config", str(cfg), "probe")).profile
+    assert (p.amg.offset, p.amg.length, p.rule.byte, p.rule.on) == (0x0100, 4, 1, 0x01)
+    assert p.lamp is None
+
+
+def test_bad_profile_is_a_usage_error(tmp_path):
+    cfg = tmp_path / "car.toml"
+    cfg.write_text("[amg]\noffset = 0x0100\nlength = 4\nbyte = 9\noff = 0x00\non = 0x01\n")
+    with pytest.raises(cli.UsageError, match="profile"):
+        cli.settings(parse("--config", str(cfg), "probe"))
 
 
 def test_missing_ids_is_a_usage_error(tmp_path):

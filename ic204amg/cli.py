@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from . import cluster as cl
+from . import profile as pf
 from . import seedkey, uds
 from .transport import OP20_DLL, J2534Transport, TransportError
 
@@ -32,6 +33,7 @@ class Settings:
     sw: str
     dll: str
     baud: int
+    profile: pf.Profile
     txid: int | None = None
     rxid: int | None = None
 
@@ -125,18 +127,23 @@ def settings(args: argparse.Namespace) -> Settings:
         raise UsageError(str(e)) from e
     txid = args.txid if args.txid is not None else c.get("txid")
     rxid = args.rxid if args.rxid is not None else c.get("rxid")
+    try:
+        profile = pf.from_config(cfg.get("amg"), cfg.get("lamp"))
+    except ValueError as e:
+        raise UsageError(f"car.toml profile: {e}") from e
     return Settings(
         sw=sw,
         dll=str(args.dll or o.get("dll", OP20_DLL)),
         baud=int(args.baud or c.get("baud", 500000)),
+        profile=profile,
         txid=None if txid is None else int(txid),
         rxid=None if rxid is None else int(rxid),
     )
 
 
-def load_backup(path: Path) -> cl.Backup:
+def load_backup(path: Path, profile: pf.Profile) -> cl.Backup:
     try:
-        return cl.Backup.load(path)
+        return cl.Backup.load(path, profile)
     except (OSError, ValueError) as e:
         raise UsageError(str(e)) from e
 
@@ -149,6 +156,10 @@ def cmd_selftest(s: Settings) -> int:
         ok = ok and good
         print(f"seed-key {sw} level {level:02X} {seed} -> {got} {'OK' if good else 'FAIL'}")
     print(f"seed-key table for sw {s.sw}: OK")
+    p = s.profile
+    lamp = f"{p.lamp.window.name}[{p.lamp.byte}]={p.lamp.value:02X}" if p.lamp else "none"
+    amg = f"{p.amg.name} byte {p.rule.byte} {p.rule.off:02X}/{p.rule.on:02X}"
+    print(f"profile: amg {amg}, lamp {lamp}")
     print(f"python {sys.version.split()[0]} {struct.calcsize('P') * 8}-bit")
     try:
         import udsoncan
@@ -202,7 +213,7 @@ def run_job(
         check_battery(t.vbatt(), required=writes and not ignore_battery)
         if job is None:
             return 0
-        c = cl.Cluster(t, sw=s.sw, meta={"txid": hex(txid), "rxid": hex(rxid)})
+        c = cl.Cluster(t, sw=s.sw, meta={"txid": hex(txid), "rxid": hex(rxid)}, profile=s.profile)
         c.extended_session()
         t.start_tester_present()
         job(c)
@@ -225,7 +236,7 @@ def dispatch(args: argparse.Namespace, s: Settings) -> int:
         case "readonly":
             return run_job(s, lambda c: cl.run_readonly(c, backup_path))
         case "write":
-            expect = load_backup(args.expect) if args.expect else None
+            expect = load_backup(args.expect, s.profile) if args.expect else None
             level = int(args.write_level, 16)
             return run_job(
                 s,
@@ -242,7 +253,7 @@ def dispatch(args: argparse.Namespace, s: Settings) -> int:
                 ignore_battery=args.ignore_battery,
             )
         case "restore":
-            saved = load_backup(args.backup)
+            saved = load_backup(args.backup, s.profile)
             level = int(args.write_level, 16)
             return run_job(
                 s,
