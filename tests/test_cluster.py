@@ -91,6 +91,16 @@ def test_write_ff_to_fc(backup_path):
     assert ecu.mem[uds.AMG][0] == 0xFC
 
 
+def test_write_level_reunlocks_at_the_given_level(backup_path):
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    cl.run_write(c, backup_path, yes, write_level=0x0D)
+    write_i = next(i for i, r in enumerate(t.sent) if r[0] == uds.SID_WRITE_MEMORY)
+    assert t.sent[write_i - 2] == uds.request_seed(0x0D)  # fresh seed at the write level
+    assert t.sent[write_i - 1][:2] == bytes([uds.SID_SECURITY, 0x0E])
+    assert ecu.mem[uds.AMG][0] == 0xFF  # read-unlock still 0x09, write still lands
+
+
 @pytest.mark.parametrize("amg", ["4000112233445566", "1020000000000000"])
 def test_unknown_byte0_stops_before_any_write(backup_path, amg):
     t, c = connect(FakeIc204(amg=amg))

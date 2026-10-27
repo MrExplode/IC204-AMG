@@ -67,12 +67,14 @@ class FakeIc204:
             return []
         if self.session != 3:
             return [bytes([uds.NEGATIVE, sid, 0x7F])]
-        if sid == uds.SID_SECURITY and req[1] == 0x09:
-            return [bytes([0x67, 0x09]) + self.seed]
-        if sid == uds.SID_SECURITY and req[1] == 0x0A:
-            if self.accept_key and req[2:] == KEY:
+        if sid == uds.SID_SECURITY:
+            sub = req[1]
+            if sub % 2:  # odd sub-function = request seed, even = send key for sub - 1
+                return [bytes([0x67, sub]) + self.seed]
+            expected = ic204_generate_key(sub - 1, self.seed, SW)
+            if self.accept_key and req[2:] == expected:
                 self.unlocked = True
-                return [bytes([0x67, 0x0A])]
+                return [bytes([0x67, sub])]
             return [bytes([uds.NEGATIVE, sid, 0x35])]
         if sid in (uds.SID_READ_MEMORY, uds.SID_WRITE_MEMORY):
             if not self.unlocked:

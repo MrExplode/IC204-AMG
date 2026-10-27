@@ -53,8 +53,11 @@ ic204amg lampfix       # only if ESP/CNG/preheat lamp misbehaves afterwards (run
 ic204amg restore backups\<file>.json [--lamp]
 ```
 Every writing command re-reads first, saves a fresh backup, refuses below 12.5 V
-(`--ignore-battery` overrides) and asks you to type the new byte value. `write` toggles byte 0
-each time it runs, so run it once; `lampfix` and `restore` are the follow-ups.
+(`--ignore-battery` overrides) and asks you to type the new byte value. It unlocks again right
+before the write, because security access lapses while that prompt waits. `write` toggles byte 0
+each time it runs, so run it once; `lampfix` and `restore` are the follow-ups. If a write returns
+`7F 3D 33` even so, the write service may need a higher SecurityAccess level: pass
+`--write-level 0x0D` (choices `0x01 0x03 0x09 0x0D`; reads stay on 0x09).
 Exit codes: 0 ok, 1 usage/config, 2 runbook STOP, 3 UDS/transport error. Copy `backups/` and
 `logs/` back here after each session.
 

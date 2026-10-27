@@ -97,19 +97,18 @@ class Cluster:
         self.p2, self.p2_star = max(self.p2, p2), max(self.p2_star, p2_star)
         log.info("timeouts: P2 %.2f s, P2* %.2f s", self.p2, self.p2_star)
 
-    def unlock(self) -> None:
-        resp = self.request("request seed", uds.request_seed(self.level))
+    def unlock(self, level: int | None = None) -> None:
+        level = self.level if level is None else level
+        resp = self.request("request seed", uds.request_seed(level))
         seed = resp[2:]
         if len(seed) != 8:
             raise uds.UnexpectedResponseError(f"seed reply has {len(seed)} seed bytes, expected 8")
         if seed == bytes(8):
             log.info("seed is all zero: already unlocked")
             return
-        key = ic204_generate_key(self.level, seed, self.sw)
-        log.info(
-            "seed %s -> key %s (%s level %02X)", uds.hexs(seed), uds.hexs(key), self.sw, self.level
-        )
-        self.request("send key", uds.send_key(self.level, key))
+        key = ic204_generate_key(level, seed, self.sw)
+        log.info("seed %s -> key %s (%s level %02X)", uds.hexs(seed), uds.hexs(key), self.sw, level)
+        self.request("send key", uds.send_key(level, key))
 
     def read_window(self, window: uds.Window) -> bytes:
         resp = self.request(f"read {window.name}", uds.read_memory(window))
@@ -156,7 +155,11 @@ def run_readonly(cluster: Cluster, backup_path: Path) -> Backup:
 
 
 def run_write(
-    cluster: Cluster, backup_path: Path, confirm: Confirm, expect: Backup | None = None
+    cluster: Cluster,
+    backup_path: Path,
+    confirm: Confirm,
+    expect: Backup | None = None,
+    write_level: int | None = None,
 ) -> None:
     b = run_readonly(cluster, backup_path)
     if expect is not None and b.amg != expect.amg:
@@ -174,13 +177,15 @@ def run_write(
         raise Stop("write declined; nothing written")
     # Security access lapses while the prompt waits for the operator, faster than the S3
     # session timer TesterPresent refreshes, so re-unlock immediately before every write.
-    cluster.unlock()
+    cluster.unlock(write_level)
     cluster.write_window(uds.AMG, new)
     cluster.reset()
     log.info("done: check AMG page, odometer and lamps per the runbook; lamp trouble -> lampfix")
 
 
-def run_lampfix(cluster: Cluster, backup_path: Path, confirm: Confirm) -> None:
+def run_lampfix(
+    cluster: Cluster, backup_path: Path, confirm: Confirm, write_level: int | None = None
+) -> None:
     """Runbook step 12, only after a lamp misbehaves: last byte of 0x0260 -> 60."""
     b = run_readonly(cluster, backup_path)
     new = b.lamp[:-1] + bytes([uds.LAMP_FIX_BYTE])
@@ -193,13 +198,18 @@ def run_lampfix(cluster: Cluster, backup_path: Path, confirm: Confirm) -> None:
     )
     if not confirm(prompt, f"{uds.LAMP_FIX_BYTE:02X}"):
         raise Stop("lamp fix declined; nothing written")
-    cluster.unlock()
+    cluster.unlock(write_level)
     cluster.write_window(uds.LAMP, new)
     cluster.reset()
 
 
 def run_restore(
-    cluster: Cluster, saved: Backup, confirm: Confirm, lamp: bool, backup_path: Path
+    cluster: Cluster,
+    saved: Backup,
+    confirm: Confirm,
+    lamp: bool,
+    backup_path: Path,
+    write_level: int | None = None,
 ) -> None:
     current = run_readonly(cluster, backup_path)
     windows = [(uds.AMG, current.amg, saved.amg)]
@@ -213,6 +223,6 @@ def run_restore(
         prompt = f"RESTORE {window.name}\n  current: {uds.hexs(cur)}\n  backup:  {uds.hexs(want)}"
         if not confirm(prompt, f"{token:02X}"):
             raise Stop("restore declined")
-        cluster.unlock()
+        cluster.unlock(write_level)
         cluster.write_window(window, want)
     cluster.reset()

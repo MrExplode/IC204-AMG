@@ -92,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
     writing.add_argument(
         "--ignore-battery", action="store_true", help=f"write even below {MIN_WRITE_VBATT} V"
     )
+    writing.add_argument(
+        "--write-level",
+        choices=["0x01", "0x03", "0x09", "0x0D"],
+        default="0x09",
+        help="SecurityAccess level for the write unlock; try 0x0D if a write returns 7F 3D 33",
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("selftest", help="seed-key vectors, udsoncan import, DLL load; no cable")
     sub.add_parser("probe", help="open the Openport, show versions and battery; no bus traffic")
@@ -220,24 +226,27 @@ def dispatch(args: argparse.Namespace, s: Settings) -> int:
             return run_job(s, lambda c: cl.run_readonly(c, backup_path))
         case "write":
             expect = load_backup(args.expect) if args.expect else None
+            level = int(args.write_level, 16)
             return run_job(
                 s,
-                lambda c: cl.run_write(c, backup_path, confirm_cli, expect),
+                lambda c: cl.run_write(c, backup_path, confirm_cli, expect, level),
                 writes=True,
                 ignore_battery=args.ignore_battery,
             )
         case "lampfix":
+            level = int(args.write_level, 16)
             return run_job(
                 s,
-                lambda c: cl.run_lampfix(c, backup_path, confirm_cli),
+                lambda c: cl.run_lampfix(c, backup_path, confirm_cli, level),
                 writes=True,
                 ignore_battery=args.ignore_battery,
             )
         case "restore":
             saved = load_backup(args.backup)
+            level = int(args.write_level, 16)
             return run_job(
                 s,
-                lambda c: cl.run_restore(c, saved, confirm_cli, args.lamp, backup_path),
+                lambda c: cl.run_restore(c, saved, confirm_cli, args.lamp, backup_path, level),
                 writes=True,
                 ignore_battery=args.ignore_battery,
             )

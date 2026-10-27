@@ -44,3 +44,13 @@ def test_check_battery(volts, required, stops):
             cli.check_battery(volts, required)
     else:
         cli.check_battery(volts, required)
+
+
+def test_write_level_flag_parses_hex():
+    assert parse("write").write_level == "0x09"
+    assert int(parse("write", "--write-level", "0x0D").write_level, 16) == 0x0D
+
+
+def test_write_level_flag_rejects_unlisted_value():
+    with pytest.raises(SystemExit):
+        parse("write", "--write-level", "0x05")
