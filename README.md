@@ -45,8 +45,9 @@ Standalone tool to enable the **AMG instrument-cluster menu** on a Mercedes IC20
 Download `ic204amg-win32.zip` from the
 [releases](https://github.com/MrExplode/IC204-AMG/releases) (the `bundle` GitHub Action builds
 it from `tools/build_bundle.py`: embeddable 32-bit CPython 3.15 + udsoncan + this tool) and
-unzip it anywhere on the laptop, e.g. `C:\work\amg`. Nothing is installed; delete the folder to
-undo. To build it yourself, see [Develop](#develop).
+unzip it anywhere on the laptop, e.g. `C:\work\amg`. The folder holds `ic204amg.cmd`,
+`car.example.toml` and a `python\` subfolder; `logs\` and `backups\` appear next to them.
+Nothing is installed; delete the folder to undo. To build it yourself, see [Develop](#develop).
 
 ### 2. Configure `car.toml`
 
@@ -192,12 +193,12 @@ Linux or macOS, [uv](https://docs.astral.sh/uv/):
 uv sync                                  # .venv: python 3.15 (matches the bundle)
 uv run pytest
 uv run ruff format . && uv run ruff check . && uv run ty check
-python3 tools/build_bundle.py            # dist/py + dist/ic204amg-win32.zip, stdlib only
+python3 tools/build_bundle.py            # dist/ic204amg-win32/ and .zip, stdlib only
 ```
 
 `tools/build_bundle.py` downloads the embeddable CPython and the udsoncan wheel (sha256
-checked), adds `ic204amg/`, `ic204amg.cmd` and `car.example.toml`, and needs nothing on the
-laptop. The `bundle` GitHub Action runs the tests and builds the same zip on every push; pushing
+checked), puts them with `ic204amg/` in `python/`, and `ic204amg.cmd` plus `car.example.toml`
+at the top; the launcher runs from its own folder, so nothing on the laptop is touched. The `bundle` GitHub Action runs the tests and builds the same zip on every push; pushing
 a `v*` tag attaches it to a release.
 
 ## Layout
