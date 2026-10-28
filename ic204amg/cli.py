@@ -128,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
 def settings(args: argparse.Namespace) -> Settings:
     cfg = load_config(args.config)
     c, o = cfg.get("cluster", {}), cfg.get("openport", {})
-    sw = args.sw or c.get("sw")
+    sw = args.sw or c.get("sw") or None  # "" in car.toml is the unfilled placeholder
     if sw is not None:
         sw = str(sw)
         try:

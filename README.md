@@ -50,8 +50,10 @@ undo. To build it yourself, see [Develop](#develop).
 
 ### 2. Configure `car.toml`
 
-In the unzipped folder, copy `car.example.toml` to `car.toml` and fill it in. Every key can
-also be given on the command line (`--txid`, `--rxid`, `--baud`, `--sw`, `--dll`).
+In the unzipped folder, copy `car.example.toml` to `car.toml`. **On a W204 with an IC_204
+cluster, `sw` is normally the only value to fill in**; the CAN ids and DLL path ship with the
+IC_204 defaults. Every key can also be given on the command line (`--txid`, `--rxid`, `--baud`,
+`--sw`, `--dll`).
 
 | Key | Section | Meaning | Where it comes from |
 | --- | --- | --- | --- |

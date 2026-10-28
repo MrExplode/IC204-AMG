@@ -66,6 +66,15 @@ def test_selftest_fails_without_sw(tmp_path):
     assert cli.main(["--config", str(tmp_path / "none.toml"), "selftest"]) == 1
 
 
+def test_empty_sw_placeholder_counts_as_unset(tmp_path):
+    cfg = tmp_path / "car.toml"
+    cfg.write_text('[cluster]\ntxid = 0x60A\nrxid = 0x481\nsw = ""\n')
+    s = cli.settings(parse("--config", str(cfg), "probe"))
+    assert s.sw is None
+    with pytest.raises(cli.UsageError, match="sw not set"):
+        s.require_sw()
+
+
 def test_missing_sw_is_a_usage_error_before_the_cable(tmp_path):
     argv = ["--config", str(tmp_path / "none.toml"), "--log-dir", str(tmp_path / "logs")]
     # without the check this would reach J2534Transport.open() and come back as 3
