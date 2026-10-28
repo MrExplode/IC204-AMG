@@ -1,6 +1,6 @@
 [project]
 name = "ic204amg"
-version = "0.1.0"
+version = "0.1.1"
 description = "W204 IC204 AMG-menu EEPROM job over an Openport 2.0 (J2534), standalone, no Vediamo"
 readme = "README.md"
 license = "MIT"

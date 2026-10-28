@@ -61,7 +61,7 @@ IC_204 defaults. Every key can also be given on the command line (`--txid`, `--r
 | `txid` | `[cluster]` | request CAN id | `CP_REQUEST_CANIDENTIFIER` in the cluster's CBF; `0x60A` for IC_204 `[S]` (`tools/cbf/ic204_comparams.txt`) |
 | `rxid` | `[cluster]` | response CAN id | `CP_RESPONSE_CANIDENTIFIER`; `0x481` for IC_204 `[S]` |
 | `baud` | `[cluster]` | CAN bit rate | `CP_BAUDRATE`; `500000` for IC_204 `[S]` |
-| `sw` | `[cluster]` | the cluster's 10-digit software part number | IC204 identification in Xentry/Vediamo/DAS. `ic204amg selftest` lists the 42 supported numbers. A wrong one is a rejected key, and the cluster counts failed attempts |
+| `sw` | `[cluster]` | the cluster's 10-digit software part number | IC204 identification in Xentry/Vediamo/DAS. `ic204amg selftest` lists the 83 supported numbers. A wrong one is a rejected key, and the cluster counts failed attempts |
 | `dll` | `[openport]` | path of the J2534 DLL | the Tactrix driver; default `C:\Windows\SysWOW64\op20pt32.dll` |
 | `[amg]`, `[lamp]` | | write recipe for clusters other than W204 colour | `car.example.toml` documents the fields; the values are community-reported and unverified, see [Cluster coverage](#cluster-coverage) |
 
@@ -138,7 +138,7 @@ PDU is logged to `logs/`.
 
 | Part | Tier | Source |
 | --- | --- | --- |
-| Seed-key algorithm, SW→definition map, UDS level `09`→internal 5, test vectors | `[S]` | [jglim/UnlockECU][^unlockecu] (repo source, `Security/IC204.cs`, `IC204Tests.cs`) |
+| Seed-key algorithm, SW→definition map, UDS level `09`→internal 5, test vectors | `[S]` | [jglim/UnlockECU][^unlockecu] (repo source, `Security/IC204.cs`, `db.json`, `IC204Tests.cs`) |
 | Read/write command format, `0x10000000` address base, ALFID `0x14` | `[C]` | [MotorCarSoft][^mcs] |
 | W204 **colour** cluster: AMG `0x01D0` byte 0 `FC`↔`FF` | `[V]` | enabled the AMG menu on the author's 2013 W204 colour cluster (SW `2049022903`, 2026-10); originally reported by [autogmt][^autogmt-w204] / [MHH p.12][^mhh-change] |
 | Lamp fix: `0x0260` last byte → `0x60` | `[C]` | [MotorCarSoft][^mcs] |
@@ -160,11 +160,12 @@ this tool uses.
 
 ## Cluster coverage
 
-- **Seed-key `[S]`[^unlockecu]:** 42 software part numbers (37 salt tables + 5 aliases) across six
-  firmware families (197902, 204442, 204902, 212442, 212902, 218902 → W204/W212/C207/W218),
-  selected by the `sw` part number. `ic204amg selftest` lists them and reproduces the vectors
-  (e.g. SW `2049022903` level 9, seed `5C97A0A552FB0205` → key `D8F169D68D5D17B6`
-  `[S]`[^unlockecu-vectors]). Adding a variant is one salt table in `seedkey.py`.
+- **Seed-key `[S]`[^unlockecu]:** 83 software part numbers across six firmware families (197902,
+  204442, 204902, 212442, 212902, 218902 → W204/W212/C207/W218), selected by the `sw` part
+  number. The salt tables are the IC204 entries of UnlockECU's `db.json`, shipped as
+  `ic204amg/ic204_salts.json`; adding a variant is copying its four `Salt` values from there.
+  `ic204amg selftest` lists them and reproduces the vectors (e.g. SW `2049022903` level 9, seed
+  `5C97A0A552FB0205` → key `D8F169D68D5D17B6` `[S]`[^unlockecu-vectors]).
 - **CAN ids / baud / DLL / SW part number:** per cluster, in `car.toml`.
 - **AMG recipe:** the write windows, the flag byte and the lamp fix are a *profile*. The default
   is W204 colour (the only `[V]` profile); override it with `[amg]`/`[lamp]` in `car.toml` (see
@@ -208,6 +209,7 @@ a `v*` tag attaches it to a release.
 - `ic204amg/transport.py` - Openport via udsoncan `J2534Connection`, firmware TesterPresent
 - `ic204amg/cluster.py` - procedure, backup files, write allow-list, toggle/lamp/restore
 - `ic204amg/seedkey.py` - IC204 seed-key algorithm; vectors in `VECTORS`
+- `ic204amg/ic204_salts.json` - salt tables, the IC204 entries of UnlockECU's `db.json`
 - `tests/` - pytest; `tests/fakes.py` scripted cluster (session gate, seed-key, windows)
 - `tools/build_bundle.py`, `tools/cbf/`
 
