@@ -58,7 +58,18 @@ def test_unknown_sw_fails_before_touching_anything(tmp_path):
 
 
 def test_selftest_runs_without_cable(tmp_path):
-    assert cli.main(["--config", str(tmp_path / "none.toml"), "selftest"]) == 0
+    argv = ["--config", str(tmp_path / "none.toml"), "--sw", "2049022903"]
+    assert cli.main([*argv, "selftest"]) == 0
+
+
+def test_selftest_fails_without_sw(tmp_path):
+    assert cli.main(["--config", str(tmp_path / "none.toml"), "selftest"]) == 1
+
+
+def test_missing_sw_is_a_usage_error_before_the_cable(tmp_path):
+    argv = ["--config", str(tmp_path / "none.toml"), "--log-dir", str(tmp_path / "logs")]
+    # without the check this would reach J2534Transport.open() and come back as 3
+    assert cli.main([*argv, "--txid", "0x60A", "--rxid", "0x481", "readonly"]) == 1
 
 
 @pytest.mark.parametrize(

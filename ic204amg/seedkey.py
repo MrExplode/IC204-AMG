@@ -396,12 +396,18 @@ SW_ALIASES = {
 }
 
 
+def supported_sw() -> list[str]:
+    """Every SW part number with a salt table, aliases included."""
+    return sorted(set(SALT_TABLES) | set(SW_ALIASES))
+
+
 def get_salt_table(sw_version: str) -> dict[int, list[int]]:
     """Salt table for a SW part number, resolving aliases; ValueError if unsupported."""
     resolved = SW_ALIASES.get(sw_version, sw_version)
     if resolved not in SALT_TABLES:
-        supported = ", ".join(sorted(set(SALT_TABLES) | set(SW_ALIASES)))
-        raise ValueError(f"no seed-key table for SW {sw_version}; supported: {supported}")
+        raise ValueError(
+            f"no seed-key table for SW {sw_version}; supported: {', '.join(supported_sw())}"
+        )
     return SALT_TABLES[resolved]
 
 

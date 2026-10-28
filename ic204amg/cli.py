@@ -20,7 +20,7 @@ from .transport import OP20_DLL, J2534Transport, TransportError
 
 log = logging.getLogger(__name__)
 
-# The runbook wants a charger holding ~13.5 V before anything is written.
+# A charger holding ~13.5 V is expected before anything is written; this is only the floor.
 MIN_WRITE_VBATT = 12.5
 
 
@@ -30,7 +30,7 @@ class UsageError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    sw: str
+    sw: str | None
     dll: str
     baud: int
     profile: pf.Profile
@@ -41,6 +41,14 @@ class Settings:
         if self.txid is None or self.rxid is None:
             raise UsageError("txid/rxid not set: fill car.toml [cluster] or pass --txid/--rxid")
         return self.txid, self.rxid
+
+    def require_sw(self) -> str:
+        if self.sw is None:
+            raise UsageError(
+                "sw not set: put the cluster's SW part number in car.toml [cluster] or pass "
+                "--sw (selftest lists the supported ones)"
+            )
+        return self.sw
 
 
 def parse_int(s: str) -> int:
@@ -87,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rxid", type=parse_int, help="response CAN id (IC_204: 0x481)")
     p.add_argument("--baud", type=int)
     p.add_argument("--dll", help="J2534 DLL path")
-    p.add_argument("--sw", help="cluster SW part number for the seed-key table")
+    p.add_argument("--sw", help="cluster SW part number (seed-key table); selftest lists them")
     p.add_argument("--log-dir", type=Path, default=Path("logs"))
     p.add_argument("--backup-dir", type=Path, default=Path("backups"))
     writing = argparse.ArgumentParser(add_help=False)
@@ -103,28 +111,30 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("selftest", help="seed-key vectors, udsoncan import, DLL load; no cable")
     sub.add_parser("probe", help="open the Openport, show versions and battery; no bus traffic")
-    sub.add_parser("readonly", help="session, unlock, read 0x01D0 + 0x0260, save backup")
+    sub.add_parser("readonly", help="session, unlock, read the profile's windows, save backup")
     w = sub.add_parser(
-        "write", parents=[writing], help="readonly, then write 0x01D0 byte 0 (FC<->FF), confirmed"
+        "write", parents=[writing], help="readonly, then toggle the AMG flag byte, confirmed"
     )
-    w.add_argument("--expect", type=Path, help="earlier backup; stop if 0x01D0 differs")
+    w.add_argument("--expect", type=Path, help="earlier backup; stop if the AMG window differs")
     sub.add_parser(
-        "lampfix", parents=[writing], help="only after a lamp misbehaves: 0x0260 last byte -> 60"
+        "lampfix", parents=[writing], help="only after a lamp misbehaves: write the lamp-fix byte"
     )
     r = sub.add_parser("restore", parents=[writing], help="write a saved backup back (rollback)")
     r.add_argument("backup", type=Path)
-    r.add_argument("--lamp", action="store_true", help="also restore 0x0260")
+    r.add_argument("--lamp", action="store_true", help="also restore the lamp window")
     return p
 
 
 def settings(args: argparse.Namespace) -> Settings:
     cfg = load_config(args.config)
     c, o = cfg.get("cluster", {}), cfg.get("openport", {})
-    sw = str(args.sw or c.get("sw", cl.SW_VERSION))
-    try:
-        seedkey.get_salt_table(sw)
-    except ValueError as e:
-        raise UsageError(str(e)) from e
+    sw = args.sw or c.get("sw")
+    if sw is not None:
+        sw = str(sw)
+        try:
+            seedkey.get_salt_table(sw)
+        except ValueError as e:
+            raise UsageError(str(e)) from e
     txid = args.txid if args.txid is not None else c.get("txid")
     rxid = args.rxid if args.rxid is not None else c.get("rxid")
     try:
@@ -155,7 +165,12 @@ def cmd_selftest(s: Settings) -> int:
         good = got == want
         ok = ok and good
         print(f"seed-key {sw} level {level:02X} {seed} -> {got} {'OK' if good else 'FAIL'}")
-    print(f"seed-key table for sw {s.sw}: OK")
+    print("seed-key tables:", " ".join(seedkey.supported_sw()))
+    if s.sw:
+        print(f"seed-key table for sw {s.sw}: OK")
+    else:
+        print("sw not set in car.toml [cluster]: FAIL, pick one of the above")
+        ok = False
     p = s.profile
     lamp = f"{p.lamp.window.name}[{p.lamp.byte}]={p.lamp.value:02X}" if p.lamp else "none"
     amg = f"{p.amg.name} byte {p.rule.byte} {p.rule.off:02X}/{p.rule.on:02X}"
@@ -206,14 +221,15 @@ def run_job(
     ignore_battery: bool = False,
 ) -> int:
     txid, rxid = s.can_ids()
-    log.info("cluster txid 0x%03X rxid 0x%03X baud %d sw %s", txid, rxid, s.baud, s.sw)
+    sw = None if job is None else s.require_sw()
+    log.info("cluster txid 0x%03X rxid 0x%03X baud %d sw %s", txid, rxid, s.baud, sw or "-")
     t = J2534Transport(txid, rxid, s.baud, s.dll)
     try:
         t.open()
         check_battery(t.vbatt(), required=writes and not ignore_battery)
-        if job is None:
+        if job is None or sw is None:
             return 0
-        c = cl.Cluster(t, sw=s.sw, meta={"txid": hex(txid), "rxid": hex(rxid)}, profile=s.profile)
+        c = cl.Cluster(t, sw, meta={"txid": hex(txid), "rxid": hex(rxid)}, profile=s.profile)
         c.extended_session()
         t.start_tester_present()
         job(c)

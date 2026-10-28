@@ -7,7 +7,7 @@ AMG = uds.Window(0x01D0, 8)
 LAMP = uds.Window(0x0260, 10)
 
 
-def test_runbook_commands():
+def test_request_builders():
     assert uds.read_memory(AMG) == H("2314100001D008")
     assert uds.read_memory(LAMP) == H("2314100002600A")
     assert uds.write_memory(AMG, H("FF00000000000000")) == H("3D14100001D008FF00000000000000")

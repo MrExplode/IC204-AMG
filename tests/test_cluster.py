@@ -26,7 +26,7 @@ def no(_prompt, _token):
 
 def connect(ecu, **kwargs):
     t = FakeEcu(ecu)
-    c = cl.Cluster(t, **kwargs)
+    c = cl.Cluster(t, SW, **kwargs)
     c.extended_session()
     return t, c
 
@@ -63,7 +63,7 @@ def test_empty_and_unrelated_frames_are_skipped(backup_path):
 
 def test_silence_is_no_response():
     with pytest.raises(uds.NoResponseError):
-        cl.Cluster(FakeEcu(lambda _req: []), p2=0.01).extended_session()
+        cl.Cluster(FakeEcu(lambda _req: []), SW, p2=0.01).extended_session()
 
 
 def test_write_fc_to_ff_keeps_other_bytes(backup_path):
@@ -158,7 +158,7 @@ def test_zero_seed_means_already_unlocked(backup_path):
 
 def test_missing_session_is_a_negative(backup_path):
     with pytest.raises(uds.NegativeResponseError) as info:
-        cl.run_readonly(cl.Cluster(FakeEcu(FakeIc204())), backup_path)
+        cl.run_readonly(cl.Cluster(FakeEcu(FakeIc204()), SW), backup_path)
     assert info.value.nrc == 0x7F
 
 

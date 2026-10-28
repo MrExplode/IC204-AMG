@@ -1,4 +1,4 @@
-"""The runbook procedure: session, unlock, backup reads, byte-0 decision, verified writes."""
+"""The procedure: session, unlock, backup reads, flag-byte decision, verified writes."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from .transport import Transport
 
 log = logging.getLogger(__name__)
 
-SW_VERSION = "2049022903"
 LEVEL = 0x09
 # Floors; the 50 03 reply can only raise them (the CBF says P2 150 ms, P2* 2000 ms).
 P2 = 1.0
@@ -26,7 +25,7 @@ Confirm = Callable[[str, str], bool]
 
 
 class Stop(Exception):  # noqa: N818 - a controlled halt, not a failure
-    """The runbook says stop here. Nothing further is written."""
+    """A safety rule halts the job here. Nothing further is written."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +70,7 @@ class Cluster:
     def __init__(
         self,
         transport: Transport,
-        sw: str = SW_VERSION,
+        sw: str,
         level: int = LEVEL,
         p2: float = P2,
         p2_star: float = P2_STAR,
@@ -202,13 +201,15 @@ def run_write(
     cluster.unlock(write_level)
     cluster.write_window(window, new)
     cluster.reset()
-    log.info("done: check AMG page, odometer and lamps per the runbook; lamp trouble -> lampfix")
+    log.info(
+        "done: check the AMG page, the odometer and the warning lamps; lamp trouble -> lampfix"
+    )
 
 
 def run_lampfix(
     cluster: Cluster, backup_path: Path, confirm: Confirm, write_level: int | None = None
 ) -> None:
-    """Runbook step 12, only after a lamp misbehaves: set the profile's lamp byte."""
+    """Only after a lamp misbehaves: set the profile's lamp byte."""
     lamp = cluster.profile.lamp
     if lamp is None:
         raise Stop("this profile has no lamp window; nothing to fix")

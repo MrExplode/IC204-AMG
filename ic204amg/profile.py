@@ -60,8 +60,9 @@ class Profile:
         return (self.amg, self.lamp.window) if self.lamp else (self.amg,)
 
 
-# Verified on a 2013 W204 colour cluster (SW 2049022903): byte 0 of 0x01D0 is FC off / FF on,
-# and the OM651 CNG/ESP/preheat lamp fix sets the last byte of 0x0260 to 0x60.
+# Verified on a 2013 W204 colour cluster (SW 2049022903): byte 0 of 0x01D0 is FC off / FF on.
+# The lamp fix (last byte of 0x0260 -> 0x60, for a wrong ESP/CNG/preheat lamp after the write)
+# is community-reported only; see the README's confidence table.
 W204_COLOUR = Profile(
     amg=Window(0x01D0, 8),
     rule=FlagRule(byte=0, off=0xFC, on=0xFF),

@@ -12,6 +12,12 @@ def test_aliases_share_a_table():
     assert seedkey.get_salt_table("2049026403") is seedkey.get_salt_table("2049022903")
 
 
+def test_supported_sw_lists_tables_and_aliases():
+    sw = seedkey.supported_sw()
+    assert "2049022903" in sw and "2049026403" in sw
+    assert len(sw) == len(seedkey.SALT_TABLES) + len(seedkey.SW_ALIASES)
+
+
 def test_rejects_unknown_sw_level_and_seed_length():
     with pytest.raises(ValueError, match="no seed-key table"):
         seedkey.get_salt_table("2049022803")
