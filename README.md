@@ -108,9 +108,13 @@ shares the odometer's EEPROM `[I]`.
 You get an AMG page (engine/gearbox oil temp, gear, RACETIMER, depending on the bits); you do
 **not** get any physical change - dial faces, needle colours and speedometer scaling are
 untouched, and the verification steps prove it. On some cluster software the write has a side
-effect (a wrong ESP/CNG/preheat indicator lamp); a second EEPROM window is the reported fix
-(`lampfix`) `[C]`[^mcs][^autogmt-w204]. Some software versions ignore the flag entirely - that is
-a firmware matter outside this tool `[C]`[^mbtools][^mhh-change].
+effect (a wrong ESP/CNG/preheat indicator lamp); the reported fix is the last byte of a second
+EEPROM window, written to `60` (`lampfix`) `[C]`[^mcs][^autogmt-w204]. On the author's diesel the
+AMG flag left the preheat lamp stuck in its ignition-on lamp check; `60` (the byte was `42`) made
+it behave again but lit the front-fog indicator permanently, and clearing bit 1 alone (`40`) did
+nothing, so the fix is the whole byte and the fog telltale is the price `[V]`. Some software
+versions ignore the flag entirely - that is a firmware matter outside this tool
+`[C]`[^mbtools][^mhh-change].
 
 ### Sequence
 
@@ -142,6 +146,7 @@ PDU is logged to `logs/`.
 | Read/write command format, `0x10000000` address base, ALFID `0x14` | `[C]` | [MotorCarSoft][^mcs] |
 | W204 **colour** cluster: AMG `0x01D0` byte 0 `FC`↔`FF` | `[V]` | enabled the AMG menu on the author's 2013 W204 colour cluster (SW `2049022903`, 2026-10); originally reported by [autogmt][^autogmt-w204] / [MHH p.12][^mhh-change] |
 | Lamp fix: `0x0260` last byte → `0x60` | `[C]` | [MotorCarSoft][^mcs] |
+| `60` fixes the preheat lamp check and lights the front-fog indicator; `40` (bit 1 cleared only, original `42`) has no effect | `[V]` | author's cluster, 2026-11 |
 | `67 09` seed response is the level-09 exchange | `[C]` | [autogmt W212][^autogmt-w212] |
 | Write needs SecurityAccess `0x0D` where `0x09` is refused | `[V]` | observed on the author's cluster (`7F 3D 33` at `0x09`, 2026-10) |
 
