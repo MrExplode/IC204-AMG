@@ -3,7 +3,7 @@
 [cluster]
 # REQUIRED: your cluster's 10-digit software part number, as Xentry/Vediamo/DAS show it in the
 # IC204 identification (e.g. "2049022903"). It selects the seed-key table; a wrong one is a
-# rejected key. `ic204amg selftest` lists the 42 supported numbers.
+# rejected key. `ic204amg selftest` lists the 83 supported numbers.
 sw = ""
 
 # IC_204 CAN ids from the Xentry CBF (CP_REQUEST_CANIDENTIFIER / CP_RESPONSE_CANIDENTIFIER /
