@@ -144,7 +144,7 @@ PDU is logged to `logs/`.
 | --- | --- | --- |
 | Seed-key algorithm, SW→definition map, UDS level `09`→internal 5, test vectors | `[S]` | [jglim/UnlockECU][^unlockecu] (repo source, `Security/IC204.cs`, `db.json`, `IC204Tests.cs`) |
 | Read/write command format, `0x10000000` address base, ALFID `0x14` | `[C]` | [MotorCarSoft][^mcs] |
-| W204 **colour** cluster: AMG `0x01D0` byte 0 `FC`↔`FF` | `[V]` | enabled the AMG menu on the author's 2013 W204 colour cluster (SW `2049022903`, 2026-10); originally reported by [autogmt][^autogmt-w204] / [MHH p.12][^mhh-change] |
+| W204 **colour** cluster: AMG `0x01D0` byte 0 `FF` amg off, `FC` amg on | `[V]` | enabled the AMG menu on the author's 2013 W204 colour cluster (SW `2049022903`, 2026-10); originally reported by [autogmt][^autogmt-w204] / [MHH p.12][^mhh-change] |
 | Lamp fix: `0x0260` last byte → `0x60` | `[C]` | [MotorCarSoft][^mcs] |
 | `60` fixes the preheat lamp check and lights the front-fog indicator; `40` (bit 1 cleared only, original `42`) has no effect | `[V]` | author's cluster, 2026-11 |
 | `67 09` seed response is the level-09 exchange | `[C]` | [autogmt W212][^autogmt-w212] |

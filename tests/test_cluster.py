@@ -105,7 +105,7 @@ def test_write_level_reunlocks_at_the_given_level(backup_path):
 @pytest.mark.parametrize("amg", ["4000112233445566", "1020000000000000"])
 def test_unknown_byte0_stops_before_any_write(backup_path, amg):
     t, c = connect(FakeIc204(amg=amg))
-    with pytest.raises(cl.Stop, match="not FC/FF"):
+    with pytest.raises(cl.Stop, match="not FF/FC"):
         cl.run_write(c, backup_path, yes)
     assert uds.SID_WRITE_MEMORY not in sids(t)
     assert backup_path.exists()

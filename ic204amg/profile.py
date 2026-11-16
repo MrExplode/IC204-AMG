@@ -60,13 +60,13 @@ class Profile:
         return (self.amg, self.lamp.window) if self.lamp else (self.amg,)
 
 
-# Verified on a 2013 W204 colour cluster (SW 2049022903): byte 0 of 0x01D0 is FC off / FF on.
+# Verified on a 2013 W204 colour cluster (SW 2049022903): 0x01D0 byte 0 FF = amg off, FC = amg on.
 # Lamp fix (last byte of 0x0260 -> 0x60): on that cluster the byte was 42; 60 puts the preheat
 # lamp back to normal but lights the front-fog indicator permanently, and clearing bit 1 alone
 # (40) changes nothing, so the whole byte it is. See the README's confidence table.
 W204_COLOUR = Profile(
     amg=Window(0x01D0, 8),
-    rule=FlagRule(byte=0, off=0xFC, on=0xFF),
+    rule=FlagRule(byte=0, off=0xFF, on=0xFC),
     lamp=LampFix(Window(0x0260, 10), byte=-1, value=0x60),
 )
 
