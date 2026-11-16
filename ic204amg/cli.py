@@ -1,4 +1,4 @@
-"""ic204amg: selftest | probe | readonly | write | lampfix | restore. See README for the order."""
+"""ic204amg: selftest | probe | readonly | write | lampfix | lampbits | restore. See README."""
 
 from __future__ import annotations
 
@@ -88,6 +88,14 @@ def confirm_cli(prompt: str, token: str) -> bool:
     return answer.strip().upper() == token.upper()
 
 
+def ask_cli(prompt: str) -> str:
+    print()
+    try:
+        return input(prompt)
+    except EOFError:
+        return "q"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ic204amg", description=__doc__)
     p.add_argument("--config", type=Path, default=Path("car.toml"))
@@ -118,6 +126,11 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--expect", type=Path, help="earlier backup; stop if the AMG window differs")
     sub.add_parser(
         "lampfix", parents=[writing], help="only after a lamp misbehaves: write the lamp-fix byte"
+    )
+    sub.add_parser(
+        "lampbits",
+        parents=[writing],
+        help="experiment: type lamp-byte bits, write, reset, read back, repeat until q",
     )
     r = sub.add_parser("restore", parents=[writing], help="write a saved backup back (rollback)")
     r.add_argument("backup", type=Path)
@@ -265,6 +278,14 @@ def dispatch(args: argparse.Namespace, s: Settings) -> int:
             return run_job(
                 s,
                 lambda c: cl.run_lampfix(c, backup_path, confirm_cli, level),
+                writes=True,
+                ignore_battery=args.ignore_battery,
+            )
+        case "lampbits":
+            level = int(args.write_level, 16)
+            return run_job(
+                s,
+                lambda c: cl.run_lampbits(c, backup_path, ask_cli, level),
                 writes=True,
                 ignore_battery=args.ignore_battery,
             )

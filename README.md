@@ -96,6 +96,12 @@ not a universal fix. The byte differs per car and there is no way yet to predict
 value; if a value does not help, `restore <backup taken after amg on> --lamp` puts the original
 back.
 
+`lampbits` (experiment) is for hunting the right value: it shows the byte in binary, you type 8
+bits (or one bit number `0`-`7` to flip that bit) and confirm with Enter (or type a correction).
+It writes, resets, waits 10 s for the cluster to restart, reads the byte back and asks what the
+lamps do now (the note goes to the log), then asks for the next value. `q` stops at any prompt
+and lists the values tried.
+
 ## Other clusters
 
 - **Seed-key `[S]`[^unlockecu]:** 83 software part numbers in six families (197902, 204442,

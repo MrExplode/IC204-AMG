@@ -101,3 +101,8 @@ def test_write_level_flag_parses_hex():
 def test_write_level_flag_rejects_unlisted_value():
     with pytest.raises(SystemExit):
         parse("write", "--write-level", "0x05")
+
+
+def test_lampbits_takes_the_writing_flags():
+    args = parse("lampbits", "--ignore-battery")
+    assert (args.cmd, args.write_level, args.ignore_battery) == ("lampbits", "0x0D", True)

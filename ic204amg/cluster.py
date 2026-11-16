@@ -21,7 +21,13 @@ LEVEL = 0x09
 P2 = 1.0
 P2_STAR = 3.0
 
+# The cluster reboots after 11 01 and does not answer until it is back up.
+RESET_SETTLE = 10.0
+STOP_WORDS = ("q", "quit", "stop")
+
 Confirm = Callable[[str, str], bool]
+Ask = Callable[[str], str]
+Sleep = Callable[[float], None]
 
 
 class Stop(Exception):  # noqa: N818 - a controlled halt, not a failure
@@ -232,6 +238,124 @@ def run_lampfix(
     cluster.unlock(write_level)
     cluster.write_window(lamp.window, new)
     cluster.reset()
+
+
+def _bits(v: int) -> str:
+    return f"{v:08b} ({v:02X})"
+
+
+def _changed(a: int, b: int) -> str:
+    return "".join("^" if (a ^ b) >> (7 - k) & 1 else " " for k in range(8)).rstrip()
+
+
+def _ask_bits(ask: Ask, prompt: str, base: int, enter: int | None = None) -> int | None:
+    """A lamp-byte value from the operator, None to stop.
+
+    8 binary digits set the value, one digit 0-7 flips that bit of `base`; a bare Enter
+    returns `enter`, or asks again when that is None.
+    """
+    while True:
+        answer = ask(prompt).strip().replace(" ", "").replace("_", "")
+        if not answer:
+            if enter is None:
+                continue
+            return enter
+        if answer.lower() in STOP_WORDS:
+            return None
+        if len(answer) == 8 and set(answer) <= {"0", "1"}:
+            return int(answer, 2)
+        if len(answer) == 1 and answer in "01234567":
+            return base ^ 1 << int(answer)
+        log.warning("%r: need 8 binary digits (e.g. 01100000) or one bit number 0-7", answer)
+
+
+def run_lampbits(
+    cluster: Cluster,
+    backup_path: Path,
+    ask: Ask,
+    write_level: int | None = None,
+    sleep: Sleep = time.sleep,
+) -> None:
+    """Experiment: write operator-chosen bits to the lamp byte, reset, repeat until stopped."""
+    lamp = cluster.profile.lamp
+    if lamp is None:
+        raise Stop("this profile has no lamp window; nothing to try")
+    b = run_readonly(cluster, backup_path)
+    assert b.lamp is not None  # the profile has a lamp window, so backup read it
+    window, i = lamp.window, lamp.byte % lamp.window.length
+    label = f"LAMP 0x{window.offset + i:04X} ({window.name} byte {i})"
+    cur_window, start = b.lamp, b.lamp[i]
+    tried: list[int] = []
+    now: int | None = start  # None from the moment a write is sent until its read-back verifies
+    try:
+        while True:
+            cur = cur_window[i]
+            prompt = (
+                f"{label}\n  {'bit:':<10}76543210\n  {'at start:':<10}{_bits(start)}\n"
+                f"  {'current:':<10}{_bits(cur)}\n"
+                "new value (8 bits, or 0-7 to flip one bit), q to stop: "
+            )
+            val = _ask_bits(ask, prompt, cur)
+            while val is not None and val != cur:
+                prompt = (
+                    f"WRITE {label}\n  {'current:':<10}{_bits(cur)}\n  {'new:':<10}{_bits(val)}\n"
+                    f"  {'':<10}{_changed(cur, val)}\n"
+                    "Enter to write, or a correction (8 bits, or 0-7 to flip a bit of new), "
+                    "q to stop: "
+                )
+                corrected = _ask_bits(ask, prompt, val, enter=val)
+                if corrected == val:
+                    break
+                val = corrected
+            if val is None:
+                break
+            if val == cur:
+                log.info("lamp byte already %s: nothing to write", _bits(cur))
+                continue
+            new = bytearray(cur_window)
+            new[i] = val
+            # An ignition cycle while a prompt waited drops the session; 10 03 again is
+            # harmless when it did not.
+            cluster.extended_session()
+            cluster.unlock(write_level)
+            tried.append(val)
+            now = None
+            cluster.write_window(window, bytes(new))
+            now = val
+            cluster.reset()
+            log.info("waiting %.0f s for the cluster to restart", RESET_SETTLE)
+            sleep(RESET_SETTLE)
+            cluster.extended_session()
+            cluster.unlock()
+            cur_window = cluster.read_window(window)
+            now = cur_window[i]
+            if now == val:
+                log.info("lamp byte kept %s across the reset", _bits(now))
+            else:
+                log.warning(
+                    "lamp byte reads %s after the reset, not the written %s: the cluster "
+                    "did not keep it",
+                    _bits(now),
+                    _bits(val),
+                )
+            note = ask("what do the lamps do now? (note for the log, Enter to skip, q to stop): ")
+            note = note.strip()
+            if note.lower() in STOP_WORDS:
+                break
+            if note:
+                log.info("NOTE %s: %s", _bits(now), note)
+    finally:
+        if not tried:
+            log.info("lampbits stopped; nothing written")
+        else:
+            hint = "" if now == start else f"; `restore {backup_path} --lamp` puts {start:02X} back"
+            log.info(
+                "lampbits stopped: at start %s, tried %s, now %s%s",
+                _bits(start),
+                " ".join(f"{v:02X}" for v in tried),
+                "unknown" if now is None else _bits(now),
+                hint,
+            )
 
 
 def run_restore(

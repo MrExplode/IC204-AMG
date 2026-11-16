@@ -1,4 +1,5 @@
 import json
+import logging
 
 import pytest
 
@@ -177,6 +178,138 @@ def test_lampfix_already_applied_writes_nothing(backup_path):
     cl.run_lampfix(c, backup_path, yes)
     assert uds.SID_WRITE_MEMORY not in sids(t)
     assert ecu.resets == 0
+
+
+def scripted(*answers):
+    it = iter(answers)
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return next(it)
+
+    return ask, prompts
+
+
+def lamp_writes(t):
+    return [r[-1] for r in t.sent if r[0] == uds.SID_WRITE_MEMORY]
+
+
+def lampbits(c, backup_path, *answers):
+    ask, prompts = scripted(*answers)
+    sleeps = []
+    cl.run_lampbits(c, backup_path, ask, sleep=sleeps.append)
+    return prompts, sleeps
+
+
+def test_lampbits_iterates_with_reset_until_stopped(backup_path, caplog):
+    caplog.set_level(logging.INFO)
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    answers = ("0110 0000", "", "preheat ok, fog on", "00100000", "", "", "q")
+    prompts, sleeps = lampbits(c, backup_path, *answers)
+    assert bytes(ecu.mem[LAMP]) == H("00112233445566778820")
+    assert bytes(ecu.mem[AMG]) == H(AMG0)
+    assert lamp_writes(t) == [0x60, 0x20]
+    assert ecu.resets == 2
+    assert sleeps == [cl.RESET_SETTLE, cl.RESET_SETTLE]
+    assert "at start: 10011001 (99)" in prompts[-1]
+    assert "current:  00100000 (20)" in prompts[-1]
+    assert "NOTE 01100000 (60): preheat ok, fog on" in caplog.text
+    assert "tried 60 20, now 00100000 (20)" in caplog.text
+    assert f"restore {backup_path} --lamp" in caplog.text
+
+
+def test_lampbits_survives_an_ignition_cycle_while_a_prompt_waits(backup_path):
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    answers = iter(("01100000", "", "q"))
+
+    def ask(_prompt):
+        ecu.session, ecu.unlocked = 1, False
+        return next(answers)
+
+    cl.run_lampbits(c, backup_path, ask, sleep=lambda _seconds: None)
+    assert lamp_writes(t) == [0x60]
+
+
+def test_lampbits_correction_replaces_value_before_write(backup_path):
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    prompts, _ = lampbits(c, backup_path, "01100000", "00100000", "", "q")
+    assert lamp_writes(t) == [0x20]
+    assert "new:      00100000 (20)" in prompts[2]
+    assert ecu.resets == 1
+
+
+def test_lampbits_bit_number_flips_current_then_the_pending_value(backup_path):
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    prompts, _ = lampbits(c, backup_path, "5", "0", "", "q")
+    assert "new:      10111001 (B9)" in prompts[1]
+    assert lamp_writes(t) == [0xB8]
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [("012", "8", "1001100", "q"), ("01100000", "q"), ("10011001", "q"), ("", "", "q")],
+)
+def test_lampbits_writes_nothing(backup_path, caplog, answers):
+    caplog.set_level(logging.INFO)
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    lampbits(c, backup_path, *answers)
+    assert uds.SID_WRITE_MEMORY not in sids(t)
+    assert ecu.resets == 0
+    assert "nothing written" in caplog.text
+
+
+def test_lampbits_stop_at_confirm_after_a_write_keeps_it(backup_path):
+    ecu = FakeIc204()
+    t, c = connect(ecu)
+    lampbits(c, backup_path, "01100000", "", "", "00100000", "q")
+    assert lamp_writes(t) == [0x60]
+    assert ecu.mem[LAMP][-1] == 0x60
+
+
+def test_lampbits_back_at_start_gives_no_restore_hint(backup_path, caplog):
+    caplog.set_level(logging.INFO)
+    _, c = connect(FakeIc204())
+    lampbits(c, backup_path, "01100000", "", "", "10011001", "", "q")
+    assert "tried 60 99, now 10011001 (99)" in caplog.text
+    assert "restore" not in caplog.text
+
+
+def test_lampbits_reports_a_value_the_cluster_did_not_keep(backup_path, caplog):
+    ecu = FakeIc204()
+
+    def reverting(req):
+        out = ecu(req)
+        if req[0] == uds.SID_RESET:
+            ecu.mem[LAMP][-1] = 0x99
+        return out
+
+    c = cl.Cluster(FakeEcu(reverting), SW)
+    c.extended_session()
+    prompts, _ = lampbits(c, backup_path, "01100000", "", "", "q")
+    assert "did not keep it" in caplog.text
+    assert "current:  10011001 (99)" in prompts[-1]
+
+
+def test_lampbits_summary_survives_an_error_after_a_write(backup_path, caplog):
+    caplog.set_level(logging.INFO)
+    ecu = FakeIc204()
+
+    def reset_reply_lost(req):
+        out = ecu(req)
+        return [] if req[0] == uds.SID_RESET else out
+
+    c = cl.Cluster(FakeEcu(reset_reply_lost), SW, p2=0.01)
+    c.extended_session()
+    with pytest.raises(uds.NoResponseError):
+        lampbits(c, backup_path, "01100000", "")
+    assert "tried 60, now 01100000 (60)" in caplog.text
+    assert f"restore {backup_path} --lamp" in caplog.text
 
 
 def test_restore_puts_backup_bytes_back(backup_path):
