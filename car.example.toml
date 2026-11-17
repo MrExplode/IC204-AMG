@@ -17,7 +17,7 @@ baud = 500000
 dll = 'C:\Windows\SysWOW64\op20pt32.dll'
 
 # The AMG recipe. Omit both [amg] and [lamp] to use the built-in W204 colour-cluster profile
-# (the only one verified on a car): amg 0x01D0 byte 0 FF<->FC, lamp 0x0260 last byte -> 0x60.
+# (the only one verified on a car): amg 0x01D0 byte 0 FF<->FC, lamp 0x0260 last byte -> 0xE2.
 # For any other cluster these offsets/values are community-reported and UNVERIFIED: read your
 # own backup first and change one byte at a time. See the README variant table.
 #
@@ -32,4 +32,4 @@ dll = 'C:\Windows\SysWOW64\op20pt32.dll'
 # offset = 0x0260
 # length = 10
 # byte   = -1       # index to set (negative counts from the end)
-# value  = 0x60
+# value  = 0xE2

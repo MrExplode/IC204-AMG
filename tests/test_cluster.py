@@ -167,13 +167,13 @@ def test_lampfix_sets_only_last_byte(backup_path):
     ecu = FakeIc204()
     _, c = connect(ecu)
     cl.run_lampfix(c, backup_path, yes)
-    assert bytes(ecu.mem[LAMP]) == H("00112233445566778860")
+    assert bytes(ecu.mem[LAMP]) == H("001122334455667788E2")
     assert bytes(ecu.mem[AMG]) == H(AMG0)
     assert ecu.resets == 1
 
 
 def test_lampfix_already_applied_writes_nothing(backup_path):
-    ecu = FakeIc204(lamp="00112233445566778860")
+    ecu = FakeIc204(lamp="001122334455667788E2")
     t, c = connect(ecu)
     cl.run_lampfix(c, backup_path, yes)
     assert uds.SID_WRITE_MEMORY not in sids(t)

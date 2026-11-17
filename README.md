@@ -80,8 +80,9 @@ byte-exact copy of, so every state is reversible over OBD as long as the cluster
 ### Lamp fix
 
 On some clusters amg on brings a lamp side effect (wrong ESP/CNG/preheat lamp). The reported fix
-is the last byte of the `0x0260` window (`0x0269`), written to `60` `[C]`[^mcs][^autogmt-w204];
-`lampfix` does exactly that. Results so far:
+is the last byte of the `0x0260` window (`0x0269`), written to `60` `[C]`[^mcs][^autogmt-w204].
+On the W204 that value shuffles the light indicators, so `lampfix` writes `E2` instead `[V]`.
+Results so far:
 
 | Car | Cluster SW | `0x0269` | Binary | Result |
 | --- | --- | --- | --- | --- |
@@ -92,11 +93,10 @@ is the last byte of the `0x0260` window (`0x0269`), written to `60` `[C]`[^mcs][
 | CLS 350 CDI | `2189028400` | `60` | `01100000` | no change from `20` |
 
 On the W204, bit 5 (`0x20`) fixes the preheat lamp but shuffles the indicators, and bit 7 (`0x80`)
-on top of it puts them right: `E2` is the factory `42` with both set. `lampfix` still writes
-`60`; to set `E2`, run `lampbits` and type `11100010`. The CLS had bit 5 from the factory, so no
-single value is a universal fix. The byte differs per car and there is no way yet to predict the
-right value; if a value does not help, `restore <backup taken after amg on> --lamp` puts the
-original back.
+on top of it puts them right: `E2` is the factory `42` with both set. The CLS had bit 5 from the
+factory, so no single value is a universal fix. The byte differs per car and there is no way yet
+to predict the right value; if a value does not help, `restore <backup taken after amg on>
+--lamp` puts the original back.
 
 `lampbits` (experiment) is for hunting the right value: it shows the byte in binary, you type 8
 bits (or one bit number `0`-`7` to flip that bit) and confirm with Enter (or type a correction).
