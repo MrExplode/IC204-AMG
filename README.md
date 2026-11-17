@@ -83,18 +83,20 @@ On some clusters amg on brings a lamp side effect (wrong ESP/CNG/preheat lamp). 
 is the last byte of the `0x0260` window (`0x0269`), written to `60` `[C]`[^mcs][^autogmt-w204];
 `lampfix` does exactly that. Results so far:
 
-| Car | `0x0269` | Binary | Result |
-| --- | --- | --- | --- |
-| W204 | `42` | `01000010` | factory value |
-| W204 | `40` | `01000000` | no change from `42` |
-| W204 | `60` | `01100000` | preheat lamp fixed; fog indicator always on, parking indicator lights with low beam, low beam indicator with high beam, high beam indicator with fog lights |
-| CLS 350 CDI | `20` | `00100000` | factory value |
-| CLS 350 CDI | `60` | `01100000` | no change from `20` |
+| Car | Cluster SW | `0x0269` | Binary | Result |
+| --- | --- | --- | --- | --- |
+| W204 | `2049022903` | `42` | `01000010` | factory value |
+| W204 | `2049022903` | `60` | `01100000` | preheat lamp fixed; fog indicator always on, parking indicator lights with low beam, low beam indicator with high beam, high beam indicator with fog lights |
+| W204 | `2049022903` | `E2` | `11100010` | **solution:** preheat lamp fixed, indicators correct |
+| CLS 350 CDI | `2189028400` | `20` | `00100000` | factory value |
+| CLS 350 CDI | `2189028400` | `60` | `01100000` | no change from `20` |
 
-Setting bit 5 (`0x20`) is what changed the W204, and the CLS had it from the factory, so `60` is
-not a universal fix. The byte differs per car and there is no way yet to predict the right
-value; if a value does not help, `restore <backup taken after amg on> --lamp` puts the original
-back.
+On the W204, bit 5 (`0x20`) fixes the preheat lamp but shuffles the indicators, and bit 7 (`0x80`)
+on top of it puts them right: `E2` is the factory `42` with both set. `lampfix` still writes
+`60`; to set `E2`, run `lampbits` and type `11100010`. The CLS had bit 5 from the factory, so no
+single value is a universal fix. The byte differs per car and there is no way yet to predict the
+right value; if a value does not help, `restore <backup taken after amg on> --lamp` puts the
+original back.
 
 `lampbits` (experiment) is for hunting the right value: it shows the byte in binary, you type 8
 bits (or one bit number `0`-`7` to flip that bit) and confirm with Enter (or type a correction).
